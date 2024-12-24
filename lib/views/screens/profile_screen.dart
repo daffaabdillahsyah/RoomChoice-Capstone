@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
+import 'change_password_screen.dart';
+import 'password_history_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -88,10 +90,27 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.lock_outline,
                 title: 'Change Password',
                 onTap: () {
-                  // TODO: Navigate to change password
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ChangePasswordScreen(),
+                    ),
+                  );
                 },
               ),
               if (isAdmin) ...[
+                _MenuItem(
+                  icon: Icons.history,
+                  title: 'Password History',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PasswordHistoryScreen(),
+                      ),
+                    );
+                  },
+                ),
                 _MenuItem(
                   icon: Icons.settings_outlined,
                   title: 'Admin Settings',
