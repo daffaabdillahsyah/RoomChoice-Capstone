@@ -58,5 +58,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '480807562984',
     projectId: 'roomchoice-ead45',
     storageBucket: 'roomchoice-ead45.firebasestorage.app',
+    databaseURL: 'https://roomchoice-ead45-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 }

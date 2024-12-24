@@ -1,15 +1,14 @@
 buildscript {
-    ext.kotlin_version = '1.9.10'
+    ext.kotlin_version = '1.8.22'
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://storage.googleapis.com/download.flutter.io' }
     }
 
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.google.gms:google-services:4.4.2'
+        classpath 'com.google.gms:google-services:4.4.0'
     }
 }
 
@@ -17,7 +16,16 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://storage.googleapis.com/download.flutter.io' }
+    }
+
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            android {
+                buildFeatures {
+                    buildConfig true
+                }
+            }
+        }
     }
 }
 

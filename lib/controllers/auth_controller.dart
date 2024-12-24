@@ -42,17 +42,12 @@ class AuthController extends ChangeNotifier {
 
       // Step 2: Create user document
       final user = authResult.user!;
-      final userData = {
+      await _firestore.collection('users').doc(user.uid).set({
         'username': username,
         'email': email,
         'role': 'user',
         'createdAt': FieldValue.serverTimestamp(),
-      };
-
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .set(userData);
+      }, SetOptions(merge: true));
 
       // Step 3: Update local state
       _currentUser = User(
@@ -100,21 +95,20 @@ class AuthController extends ChangeNotifier {
 
       // Step 2: Get user data
       final user = authResult.user!;
-      final doc = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final doc = await _firestore.collection('users').doc(user.uid).get();
 
       if (!doc.exists) {
         throw Exception('User data not found');
       }
 
+      final data = doc.data()!;
+      
       // Step 3: Update local state
       _currentUser = User(
         id: user.uid,
-        username: doc.data()?['username'] ?? '',
+        username: data['username'] as String? ?? '',
         email: user.email ?? '',
-        role: doc.data()?['role'] ?? 'user',
+        role: data['role'] as String? ?? 'user',
       );
 
       _setLoading(false);
