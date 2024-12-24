@@ -29,7 +29,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        final user = context.read<AuthController>().currentUser;
+        if (user?.role == 'admin') {
+          Navigator.pushReplacementNamed(context, '/admin');
+        } else {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
       } else if (mounted) {
         final errorMessage = context.read<AuthController>().errorMessage;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -46,10 +51,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Card(
-          margin: const EdgeInsets.all(32),
+        child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
             child: Form(
               key: _formKey,
               child: Column(
@@ -58,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(
                     'Room Management System',
                     style: Theme.of(context).textTheme.headlineMedium,
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
                   TextFormField(
@@ -65,13 +70,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Email',
                       border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.email),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Please enter a valid email';
                       }
                       return null;
                     },
@@ -82,14 +85,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Password',
                       border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.lock),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
                       }
                       return null;
                     },

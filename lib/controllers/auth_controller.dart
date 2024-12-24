@@ -25,6 +25,34 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Function to create default admin account
+  Future<void> createDefaultAdmin() async {
+    try {
+      // Check if admin already exists
+      final adminDoc = await _firestore.collection('users').where('username', isEqualTo: 'admin').limit(1).get();
+      
+      if (adminDoc.docs.isEmpty) {
+        // Create admin account in Firebase Auth
+        final adminCredential = await _auth.createUserWithEmailAndPassword(
+          email: 'admin@roomchoice.com',
+          password: 'admin123',
+        );
+
+        // Create admin document in Firestore
+        await _firestore.collection('users').doc(adminCredential.user!.uid).set({
+          'username': 'admin',
+          'email': 'admin@roomchoice.com',
+          'role': 'admin',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        print('Default admin account created successfully');
+      }
+    } catch (e) {
+      print('Error creating default admin: $e');
+    }
+  }
+
   Future<bool> register(String email, String password, String username) async {
     _setLoading(true);
     _setError(null);
@@ -83,6 +111,11 @@ class AuthController extends ChangeNotifier {
     _setError(null);
 
     try {
+      // Handle admin login
+      if (email.toLowerCase() == 'admin' && password == 'admin123') {
+        email = 'admin@roomchoice.com';
+      }
+
       // Step 1: Sign in
       final authResult = await _auth.signInWithEmailAndPassword(
         email: email,
