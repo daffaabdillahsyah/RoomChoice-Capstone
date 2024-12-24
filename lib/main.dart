@@ -5,11 +5,15 @@ import 'firebase_options.dart';
 import 'controllers/auth_controller.dart';
 import 'views/screens/login_screen.dart';
 import 'views/screens/home_screen.dart';
+import 'views/screens/register_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase with App Check disabled for development
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+    name: 'RoomChoice',
   );
   
   runApp(
@@ -33,9 +37,11 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      initialRoute: '/',
       routes: {
+        '/': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/register': (context) => const RegisterScreen(),
       },
     );
   }

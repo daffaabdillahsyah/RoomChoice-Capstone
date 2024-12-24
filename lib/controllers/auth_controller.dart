@@ -1,128 +1,151 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 
 class AuthController extends ChangeNotifier {
-  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _auth = auth.FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
   
   User? _currentUser;
   bool _isLoading = false;
+  String? _errorMessage;
 
   User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
-  Future<bool> login(String email, String password) async {
-    _isLoading = true;
+  void _setLoading(bool value) {
+    _isLoading = value;
     notifyListeners();
+  }
+
+  void _setError(String? message) {
+    _errorMessage = message;
+    notifyListeners();
+  }
+
+  Future<bool> register(String email, String password, String username) async {
+    _setLoading(true);
+    _setError(null);
 
     try {
-      // Sign in with Firebase Auth
-      final userCredential = await _auth.signInWithEmailAndPassword(
+      // Step 1: Create auth user
+      final authResult = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (userCredential.user != null) {
-        // Get additional user data from Firestore
-        final userData = await _firestore
-            .collection('users')
-            .doc(userCredential.user!.uid)
-            .get();
-
-        if (userData.exists) {
-          _currentUser = User(
-            id: userCredential.user!.uid,
-            username: userData['username'] ?? '',
-            email: userCredential.user!.email ?? '',
-            role: userData['role'] ?? 'user',
-            token: await userCredential.user!.getIdToken() ?? '',
-          );
-          _isLoading = false;
-          notifyListeners();
-          return true;
-        }
+      if (authResult.user == null) {
+        throw Exception('Failed to create user');
       }
-      
-      _isLoading = false;
-      notifyListeners();
+
+      // Step 2: Create user document
+      final user = authResult.user!;
+      final userData = {
+        'username': username,
+        'email': email,
+        'role': 'user',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(userData);
+
+      // Step 3: Update local state
+      _currentUser = User(
+        id: user.uid,
+        username: username,
+        email: email,
+        role: 'user',
+      );
+
+      _setLoading(false);
+      return true;
+    } on auth.FirebaseAuthException catch (e) {
+      print('Firebase Auth error: ${e.code} - ${e.message}');
+      _setError(switch (e.code) {
+        'email-already-in-use' => 'Email is already registered',
+        'invalid-email' => 'Invalid email format',
+        'operation-not-allowed' => 'Email/password accounts are not enabled',
+        'weak-password' => 'Password is too weak',
+        _ => 'Registration failed: ${e.message}',
+      });
+      _setLoading(false);
       return false;
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      print('Unexpected error during registration: $e');
+      _setError('An unexpected error occurred');
+      _setLoading(false);
       return false;
     }
   }
 
-  Future<bool> register(String email, String password, String username) async {
-    _isLoading = true;
-    notifyListeners();
+  Future<bool> login(String email, String password) async {
+    _setLoading(true);
+    _setError(null);
 
     try {
-      // Create user in Firebase Auth
-      final userCredential = await _auth.createUserWithEmailAndPassword(
+      // Step 1: Sign in
+      final authResult = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (userCredential.user != null) {
-        // Create user document in Firestore
-        await _firestore.collection('users').doc(userCredential.user!.uid).set({
-          'username': username,
-          'email': email,
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        _currentUser = User(
-          id: userCredential.user!.uid,
-          username: username,
-          email: email,
-          role: 'user',
-          token: await userCredential.user!.getIdToken() ?? '',
-        );
-        
-        _isLoading = false;
-        notifyListeners();
-        return true;
+      if (authResult.user == null) {
+        throw Exception('Failed to login');
       }
 
-      _isLoading = false;
-      notifyListeners();
+      // Step 2: Get user data
+      final user = authResult.user!;
+      final doc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) {
+        throw Exception('User data not found');
+      }
+
+      // Step 3: Update local state
+      _currentUser = User(
+        id: user.uid,
+        username: doc.data()?['username'] ?? '',
+        email: user.email ?? '',
+        role: doc.data()?['role'] ?? 'user',
+      );
+
+      _setLoading(false);
+      return true;
+    } on auth.FirebaseAuthException catch (e) {
+      print('Firebase Auth error: ${e.code} - ${e.message}');
+      _setError(switch (e.code) {
+        'user-not-found' => 'No user found with this email',
+        'wrong-password' => 'Wrong password',
+        'invalid-email' => 'Invalid email format',
+        'user-disabled' => 'This account has been disabled',
+        _ => 'Authentication failed: ${e.message}',
+      });
+      _setLoading(false);
       return false;
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      print('Unexpected error during login: $e');
+      _setError('An unexpected error occurred');
+      _setLoading(false);
       return false;
     }
   }
 
   Future<void> logout() async {
-    await _auth.signOut();
-    _currentUser = null;
-    notifyListeners();
-  }
-
-  // Check if user is already logged in
-  Future<void> checkCurrentUser() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      final userData = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (userData.exists) {
-        _currentUser = User(
-          id: user.uid,
-          username: userData['username'] ?? '',
-          email: user.email ?? '',
-          role: userData['role'] ?? 'user',
-          token: await user.getIdToken() ?? '',
-        );
-        notifyListeners();
-      }
+    try {
+      await _auth.signOut();
+      _currentUser = null;
+      _setError(null);
+    } catch (e) {
+      print('Error during logout: $e');
+      _setError('Failed to logout');
     }
   }
 } 

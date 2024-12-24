@@ -2,30 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() async {
+  void _handleRegister() async {
     if (_formKey.currentState!.validate()) {
-      final success = await context.read<AuthController>().login(
+      final success = await context.read<AuthController>().register(
         _emailController.text,
         _passwordController.text,
+        _usernameController.text,
       );
 
       if (success && mounted) {
@@ -34,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final errorMessage = context.read<AuthController>().errorMessage;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage ?? 'Login failed'),
+            content: Text(errorMessage ?? 'Registration failed'),
             backgroundColor: Colors.red,
           ),
         );
@@ -56,10 +59,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Room Management System',
+                    'Create Account',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 32),
+                  TextFormField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter username';
+                      }
+                      if (value.length < 3) {
+                        return 'Username must be at least 3 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(
@@ -100,20 +120,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       return auth.isLoading
                           ? const CircularProgressIndicator()
                           : ElevatedButton(
-                              onPressed: _handleLogin,
+                              onPressed: _handleRegister,
                               style: ElevatedButton.styleFrom(
                                 minimumSize: const Size.fromHeight(50),
                               ),
-                              child: const Text('Login'),
+                              child: const Text('Register'),
                             );
                     },
                   ),
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
-                      Navigator.pushReplacementNamed(context, '/register');
+                      Navigator.pushReplacementNamed(context, '/');
                     },
-                    child: const Text("Don't have an account? Register"),
+                    child: const Text('Already have an account? Login'),
                   ),
                 ],
               ),

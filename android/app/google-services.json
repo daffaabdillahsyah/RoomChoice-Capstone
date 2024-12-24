@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "480807562984",
+    "project_id": "roomchoice-ead45",
+    "storage_bucket": "roomchoice-ead45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:480807562984:android:f9fc7e8e048d34fb70a35d",
+        "android_client_info": {
+          "package_name": "com.roomchoice.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhxaqnBL-hWCDawmA-ukzjFIDE0LVFOBE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
