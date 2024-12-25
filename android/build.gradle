@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlin_version = '1.8.22'
+    ext.kotlin_version = '1.9.10'
     repositories {
         google()
         mavenCentral()
@@ -16,16 +16,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-    }
-
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            android {
-                buildFeatures {
-                    buildConfig true
-                }
-            }
-        }
     }
 }
 

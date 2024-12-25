@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/dashboard_controller.dart';
+import 'controllers/kost_controller.dart';
 import 'views/screens/login_screen.dart';
 import 'views/screens/home_screen.dart';
 import 'views/screens/register_screen.dart';
@@ -29,6 +30,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => authController),
         ChangeNotifierProvider(create: (_) => DashboardController()),
+        ChangeNotifierProvider(create: (_) => KostController()),
       ],
       child: const MyApp(),
     ),

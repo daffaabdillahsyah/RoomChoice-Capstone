@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/dashboard_controller.dart';
+import '../../controllers/kost_controller.dart';
 import '../screens/profile_screen.dart';
+import '../screens/manage_kost_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -32,10 +34,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         children: [
           // Dashboard Page
           _buildDashboardPage(),
+          // Kosts Page
+          const ManageKostScreen(),
           // Users Page
           const Center(child: Text('Users')),
-          // Kosts Page
-          const Center(child: Text('Kosts')),
           // Verifications Page
           const Center(child: Text('Verifications')),
           // Profile Page
@@ -56,14 +58,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             label: 'Dashboard',
           ),
           NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Users',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.home_work_outlined),
             selectedIcon: Icon(Icons.home_work),
             label: 'Kosts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Users',
           ),
           NavigationDestination(
             icon: Icon(Icons.verified_outlined),
