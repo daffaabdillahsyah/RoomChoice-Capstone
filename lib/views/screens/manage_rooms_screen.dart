@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../../controllers/kost_controller.dart';
 import '../../models/kost_model.dart';
 
@@ -19,7 +21,7 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
   
   Room? _selectedRoom;
   Position _roomPosition = Position(x: 0, y: 0);
-  Size _roomSize = Size(width: 100, height: 100);
+  Size _roomSize = Size(width: 80, height: 80);
   Map<String, bool> _facilities = {
     'AC': false,
     'Bathroom': false,
@@ -28,8 +30,19 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
     'Wardrobe': false,
   };
   int _selectedFloor = 1;
+  final GlobalKey _floorPlanKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    // Set initial floor if available
+    if (widget.kost.floors.isNotEmpty) {
+      _selectedFloor = widget.kost.floors.keys.first;
+    }
+  }
 
   void _addRoom() {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -82,6 +95,16 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
           TextButton(
             onPressed: () {
               if (_formKey.currentState!.validate()) {
+                // Get floor plan size
+                final RenderBox renderBox = _floorPlanKey.currentContext?.findRenderObject() as RenderBox;
+                final size = renderBox.size;
+                
+                // Set initial position at center
+                _roomPosition = Position(
+                  x: (size.width - _roomSize.width) / 2,
+                  y: (size.height - _roomSize.height) / 2,
+                );
+
                 final room = Room(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
                   name: _nameController.text,
@@ -93,7 +116,11 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                   floor: _selectedFloor,
                 );
 
-                context.read<KostController>().addRoom(widget.kost.id, room);
+                context.read<KostController>().addRoom(widget.kost.id, room).then((_) {
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(content: Text('Room added. Now drag to position it on the floor plan.')),
+                  );
+                });
                 Navigator.pop(context);
 
                 _nameController.clear();
@@ -269,6 +296,7 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
           Expanded(
             flex: 2,
             child: Container(
+              key: _floorPlanKey,
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey),
@@ -279,8 +307,8 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                   // Floor Plan Image
                   if (widget.kost.floors[_selectedFloor]?.imageUrl != null)
                     Positioned.fill(
-                      child: Image.network(
-                        widget.kost.floors[_selectedFloor]!.imageUrl,
+                      child: Image.memory(
+                        _base64ToBytes(widget.kost.floors[_selectedFloor]!.imageUrl),
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -291,7 +319,29 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                       left: room.position.x,
                       top: room.position.y,
                       child: GestureDetector(
-                        onTap: () => _editRoom(room),
+                        onPanUpdate: (details) {
+                          final RenderBox box = _floorPlanKey.currentContext?.findRenderObject() as RenderBox;
+                          final Offset localPosition = box.globalToLocal(details.globalPosition);
+                          
+                          // Ensure room stays within bounds
+                          double newX = localPosition.dx - (room.size.width / 2);
+                          double newY = localPosition.dy - (room.size.height / 2);
+                          
+                          newX = newX.clamp(0, box.size.width - room.size.width);
+                          newY = newY.clamp(0, box.size.height - room.size.height);
+                          
+                          // Update room position
+                          context.read<KostController>().updateRoom(
+                            widget.kost.id,
+                            room.id,
+                            {
+                              'position': {
+                                'x': newX,
+                                'y': newY,
+                              },
+                            },
+                          );
+                        },
                         child: Container(
                           width: room.size.width,
                           height: room.size.height,
@@ -302,14 +352,24 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                               width: 2,
                             ),
                           ),
-                          child: Center(
-                            child: Text(
-                              room.name,
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                room.name,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
+                              Text(
+                                'Rp ${room.price.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -345,6 +405,30 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.color_lens),
+                          onSelected: (status) {
+                            context.read<KostController>().updateRoom(
+                              widget.kost.id,
+                              room.id,
+                              {'status': status},
+                            );
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'available',
+                              child: Text('Available (Green)'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'booked',
+                              child: Text('Booked (Yellow)'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'occupied',
+                              child: Text('Occupied (Red)'),
+                            ),
+                          ],
+                        ),
                         IconButton(
                           icon: const Icon(Icons.edit),
                           onPressed: () => _editRoom(room),
@@ -377,5 +461,10 @@ class _ManageRoomsScreenState extends State<ManageRoomsScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  Uint8List _base64ToBytes(String base64String) {
+    String base64Image = base64String.split(',').last;
+    return base64Decode(base64Image);
   }
 } 

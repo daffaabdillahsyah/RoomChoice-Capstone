@@ -295,6 +295,138 @@ class KostController extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateRoomStatus(String kostId, String roomId, String status) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
+      final kostData = kostDoc.data() as Map<String, dynamic>;
+      
+      // Get floors data
+      Map<String, dynamic> floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
+      
+      // Find room in floors
+      String? targetFloorKey;
+      int? roomIndex;
+      
+      for (var entry in floors.entries) {
+        final rooms = List<Map<String, dynamic>>.from(entry.value['rooms'] ?? []);
+        final index = rooms.indexWhere((room) => room['id'] == roomId);
+        if (index != -1) {
+          targetFloorKey = entry.key;
+          roomIndex = index;
+          break;
+        }
+      }
+      
+      if (targetFloorKey == null || roomIndex == null) {
+        throw Exception('Room not found');
+      }
+      
+      // Get rooms of target floor
+      List<Map<String, dynamic>> rooms = List<Map<String, dynamic>>.from(
+        floors[targetFloorKey]['rooms'] ?? []
+      );
+      
+      // Update room status
+      rooms[roomIndex] = {
+        ...rooms[roomIndex],
+        'status': status,
+      };
+      
+      // Update rooms in floor
+      floors[targetFloorKey]['rooms'] = rooms;
+      
+      // Update kost document
+      await _firestore.collection('kosts').doc(kostId).update({
+        'floors': floors,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<Room?> getRoomById(String kostId, String roomId) async {
+    try {
+      final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
+      final kostData = kostDoc.data() as Map<String, dynamic>;
+      
+      // Get floors data
+      Map<String, dynamic> floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
+      
+      // Find room in floors
+      for (var entry in floors.entries) {
+        final rooms = List<Map<String, dynamic>>.from(entry.value['rooms'] ?? []);
+        final roomData = rooms.firstWhere(
+          (room) => room['id'] == roomId,
+          orElse: () => <String, dynamic>{},
+        );
+        
+        if (roomData.isNotEmpty) {
+          return Room(
+            id: roomData['id'],
+            name: roomData['name'],
+            status: roomData['status'],
+            price: roomData['price'].toDouble(),
+            facilities: Map<String, bool>.from(roomData['facilities']),
+            position: Position.fromMap(roomData['position']),
+            size: Size.fromMap(roomData['size']),
+            floor: int.parse(entry.key),
+          );
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      print('Error getting room: $e');
+      return null;
+    }
+  }
+
+  Stream<List<Room>> getAvailableRooms(String kostId) {
+    return _firestore
+        .collection('kosts')
+        .doc(kostId)
+        .snapshots()
+        .map((doc) {
+          final kostData = doc.data() as Map<String, dynamic>;
+          final floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
+          
+          List<Room> availableRooms = [];
+          
+          for (var entry in floors.entries) {
+            final rooms = List<Map<String, dynamic>>.from(entry.value['rooms'] ?? []);
+            final floorRooms = rooms
+                .where((room) => room['status'] == 'available')
+                .map((room) => Room(
+                      id: room['id'],
+                      name: room['name'],
+                      status: room['status'],
+                      price: room['price'].toDouble(),
+                      facilities: Map<String, bool>.from(room['facilities']),
+                      position: Position.fromMap(room['position']),
+                      size: Size.fromMap(room['size']),
+                      floor: int.parse(entry.key),
+                    ))
+                .toList();
+            
+            availableRooms.addAll(floorRooms);
+          }
+          
+          return availableRooms;
+        });
+  }
+
   // Verification Methods
   Future<bool> verifyKost(String kostId) async {
     return updateKost(kostId, {
