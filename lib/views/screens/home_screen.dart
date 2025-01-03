@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/kost_controller.dart';
 import '../screens/profile_screen.dart';
+import '../screens/kost_detail_screen.dart';
 import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
@@ -134,7 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           child: InkWell(
                             onTap: () {
-                              // TODO: Navigate to detail
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => KostDetailScreen(kost: kost),
+                                ),
+                              );
                             },
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,

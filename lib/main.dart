@@ -6,6 +6,7 @@ import 'controllers/auth_controller.dart';
 import 'controllers/dashboard_controller.dart';
 import 'controllers/kost_controller.dart';
 import 'controllers/user_controller.dart';
+import 'controllers/booking_controller.dart';
 import 'views/screens/login_screen.dart';
 import 'views/screens/home_screen.dart';
 import 'views/screens/register_screen.dart';
@@ -33,6 +34,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => DashboardController()),
         ChangeNotifierProvider(create: (_) => KostController()),
         ChangeNotifierProvider(create: (_) => UserController()),
+        ChangeNotifierProvider(create: (_) => BookingController()),
       ],
       child: const MyApp(),
     ),
