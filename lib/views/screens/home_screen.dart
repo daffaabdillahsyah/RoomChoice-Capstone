@@ -5,6 +5,7 @@ import '../../controllers/kost_controller.dart';
 import '../screens/profile_screen.dart';
 import '../screens/kost_detail_screen.dart';
 import 'dart:convert';
+import 'bookings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -255,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Favorites Page
           const Center(child: Text('Favorites')),
           // Bookings Page
-          const Center(child: Text('Bookings')),
+          const BookingsScreen(),
           if (user?.role == 'owner') ...[
             // Add Kost Page
             const Center(child: Text('Add Kost')),

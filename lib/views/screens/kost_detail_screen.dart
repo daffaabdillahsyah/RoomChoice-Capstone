@@ -6,6 +6,145 @@ import '../../models/booking_model.dart';
 import '../../controllers/booking_controller.dart';
 import '../../controllers/auth_controller.dart';
 
+class BookingDialog extends StatefulWidget {
+  final Room room;
+  final String kostId;
+
+  const BookingDialog({
+    super.key,
+    required this.room,
+    required this.kostId,
+  });
+
+  @override
+  State<BookingDialog> createState() => _BookingDialogState();
+}
+
+class _BookingDialogState extends State<BookingDialog> {
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Book ${widget.room.name}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Price: Rp ${widget.room.price.toStringAsFixed(0)} / month'),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        _startDate = date;
+                        // Reset end date if it's before new start date
+                        if (_endDate != null && _endDate!.isBefore(_startDate!.add(const Duration(days: 30)))) {
+                          _endDate = null;
+                        }
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(_startDate != null 
+                    ? '${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'
+                    : 'Start Date'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: _startDate == null
+                    ? null
+                    : () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: _startDate!.add(const Duration(days: 30)),
+                          firstDate: _startDate!.add(const Duration(days: 30)),
+                          lastDate: _startDate!.add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          setState(() => _endDate = date);
+                        }
+                      },
+                  icon: const Icon(Icons.calendar_today),
+                  label: Text(_endDate != null 
+                    ? '${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'
+                    : 'End Date'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        Consumer<BookingController>(
+          builder: (context, controller, child) {
+            return ElevatedButton(
+              onPressed: controller.isLoading || _startDate == null || _endDate == null
+                  ? null
+                  : () async {
+                      final user = context.read<AuthController>().currentUser;
+                      if (user == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please login first')),
+                        );
+                        return;
+                      }
+
+                      final booking = Booking(
+                        id: '', // Will be set by Firestore
+                        kostId: widget.kostId,
+                        roomId: widget.room.id,
+                        userId: user.id,
+                        startDate: _startDate!,
+                        endDate: _endDate!,
+                        status: 'pending',
+                        totalPrice: widget.room.price,
+                        createdAt: DateTime.now(),
+                      );
+
+                      final success = await controller.createBooking(booking);
+                      
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success 
+                              ? 'Booking request sent successfully' 
+                              : 'Failed to create booking: ${controller.error}'),
+                          ),
+                        );
+                      }
+                    },
+              child: controller.isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Book Now'),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class KostDetailScreen extends StatefulWidget {
   final Kost kost;
 
@@ -27,6 +166,11 @@ class _KostDetailScreenState extends State<KostDetailScreen> {
     if (widget.kost.floors.isNotEmpty) {
       _selectedFloor = widget.kost.floors.keys.first;
     }
+    // Initialize the booking controller for the current user
+    final user = context.read<AuthController>().currentUser;
+    if (user != null) {
+      context.read<BookingController>().initializeUserBookings(user.id);
+    }
   }
 
   Color _getRoomStatusColor(String status) {
@@ -45,109 +189,9 @@ class _KostDetailScreenState extends State<KostDetailScreen> {
   void _showBookingDialog(BuildContext context, Room room) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Book ${room.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Price: Rp ${room.price.toStringAsFixed(0)} / month'),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => _startDate = date);
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(_startDate != null 
-                      ? '${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'
-                      : 'Start Date'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () async {
-                      if (_startDate == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please select start date first')),
-                        );
-                        return;
-                      }
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: _startDate!.add(const Duration(days: 30)),
-                        firstDate: _startDate!.add(const Duration(days: 30)),
-                        lastDate: _startDate!.add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => _endDate = date);
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(_endDate != null 
-                      ? '${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'
-                      : 'End Date'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: _startDate != null && _endDate != null
-                ? () async {
-                    final user = context.read<AuthController>().currentUser;
-                    if (user == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please login first')),
-                      );
-                      return;
-                    }
-
-                    final booking = Booking(
-                      id: '', // Will be set by Firestore
-                      kostId: widget.kost.id,
-                      roomId: room.id,
-                      userId: user.id,
-                      startDate: _startDate!,
-                      endDate: _endDate!,
-                      status: 'pending',
-                      totalPrice: room.price,
-                      createdAt: DateTime.now(),
-                    );
-
-                    final success = await context.read<BookingController>().createBooking(booking);
-                    
-                    if (mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(success 
-                            ? 'Booking request sent successfully' 
-                            : 'Failed to create booking'),
-                        ),
-                      );
-                    }
-                  }
-                : null,
-            child: const Text('Book Now'),
-          ),
-        ],
+      builder: (context) => BookingDialog(
+        room: room,
+        kostId: widget.kost.id,
       ),
     );
   }
@@ -252,61 +296,73 @@ class _KostDetailScreenState extends State<KostDetailScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: Stack(
-                        children: [
-                          // Floor Plan Image
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey),
-                            ),
-                            child: selectedFloorPlan.imageUrl != null
-                                ? Image.memory(
+                    Container(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.width,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: InteractiveViewer(
+                        minScale: 0.5,
+                        maxScale: 2.0,
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // Floor Plan Image
+                              if (selectedFloorPlan.imageUrl != null)
+                                Positioned.fill(
+                                  child: Image.memory(
                                     base64Decode(selectedFloorPlan.imageUrl.split(',')[1]),
                                     fit: BoxFit.contain,
-                                  )
-                                : const Center(
-                                    child: Icon(
-                                      Icons.image_not_supported_outlined,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
                                   ),
-                          ),
-                          // Room Positions
-                          ...selectedFloorPlan.rooms.map((room) {
-                            return Positioned(
-                              left: room.position.x,
-                              top: room.position.y,
-                              child: GestureDetector(
-                                onTap: room.status == 'available'
-                                    ? () => _showBookingDialog(context, room)
-                                    : null,
-                                child: Container(
-                                  width: room.size.width,
-                                  height: room.size.height,
-                                  decoration: BoxDecoration(
-                                    color: _getRoomStatusColor(room.status).withOpacity(0.5),
-                                    border: Border.all(
-                                      color: _getRoomStatusColor(room.status),
-                                      width: 2,
-                                    ),
+                                )
+                              else
+                                const Center(
+                                  child: Icon(
+                                    Icons.image_not_supported_outlined,
+                                    size: 48,
+                                    color: Colors.grey,
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      room.name,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                                ),
+                              // Room Positions
+                              ...selectedFloorPlan.rooms.map((room) {
+                                return Positioned(
+                                  left: room.position.x,
+                                  top: room.position.y,
+                                  child: GestureDetector(
+                                    onTap: room.status == 'available'
+                                        ? () => _showBookingDialog(context, room)
+                                        : null,
+                                    child: Container(
+                                      width: room.size.width,
+                                      height: room.size.height,
+                                      decoration: BoxDecoration(
+                                        color: _getRoomStatusColor(room.status).withOpacity(0.5),
+                                        border: Border.all(
+                                          color: _getRoomStatusColor(room.status),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          room.name,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ],
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],

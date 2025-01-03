@@ -33,6 +33,9 @@ class BookingController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Start a batch operation
+      final batch = _firestore.batch();
+
       // Check if room is available for the selected dates
       final isAvailable = await _checkRoomAvailability(
         booking.kostId,
@@ -42,20 +45,60 @@ class BookingController extends ChangeNotifier {
       );
 
       if (!isAvailable) {
-        throw Exception('Room is not available for selected dates');
+        _error = 'Room is not available for selected dates';
+        throw Exception(_error);
       }
 
-      // Create booking document
-      await _firestore.collection('bookings').add(booking.toMap());
+      // Create booking document reference
+      final bookingRef = _firestore.collection('bookings').doc();
+      batch.set(bookingRef, booking.toMap());
 
-      // Update room status
-      await _updateRoomStatus(booking.kostId, booking.roomId, 'booked');
+      // Get kost document and update room status
+      final kostDoc = await _firestore.collection('kosts').doc(booking.kostId).get();
+      if (!kostDoc.exists) {
+        throw Exception('Kost not found');
+      }
+
+      final kostData = kostDoc.data() as Map<String, dynamic>;
+      final floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
+      
+      // Find the floor containing the room
+      String? targetFloorKey;
+      int? roomIndex;
+      
+      for (var entry in floors.entries) {
+        final rooms = List<Map<String, dynamic>>.from(entry.value['rooms'] ?? []);
+        final index = rooms.indexWhere((room) => room['id'] == booking.roomId);
+        if (index != -1) {
+          targetFloorKey = entry.key;
+          roomIndex = index;
+          break;
+        }
+      }
+      
+      if (targetFloorKey == null || roomIndex == null) {
+        throw Exception('Room not found');
+      }
+      
+      // Update room status in the floor
+      final rooms = List<Map<String, dynamic>>.from(floors[targetFloorKey]['rooms'] ?? []);
+      rooms[roomIndex]['status'] = 'booked';
+      floors[targetFloorKey]['rooms'] = rooms;
+
+      // Add kost update to batch
+      batch.update(_firestore.collection('kosts').doc(booking.kostId), {
+        'floors': floors,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Commit the batch operation
+      await batch.commit();
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -122,6 +165,37 @@ class BookingController extends ChangeNotifier {
     DateTime endDate,
   ) async {
     try {
+      // Get the room's current status first
+      final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
+      if (!kostDoc.exists) {
+        throw Exception('Kost not found');
+      }
+
+      final kostData = kostDoc.data() as Map<String, dynamic>;
+      final floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
+      
+      // Find the room in floors
+      String? roomStatus;
+      for (var entry in floors.entries) {
+        final rooms = List<Map<String, dynamic>>.from(entry.value['rooms'] ?? []);
+        final room = rooms.firstWhere(
+          (room) => room['id'] == roomId,
+          orElse: () => <String, dynamic>{},
+        );
+        if (room.isNotEmpty) {
+          roomStatus = room['status'] as String?;
+          break;
+        }
+      }
+
+      if (roomStatus == null) {
+        throw Exception('Room not found');
+      }
+
+      if (roomStatus != 'available') {
+        return false;
+      }
+
       // Check if there are any overlapping bookings
       final overlappingBookings = await _firestore
           .collection('bookings')
@@ -140,32 +214,56 @@ class BookingController extends ChangeNotifier {
         }
       }
 
-      // Check if room is marked as occupied
-      final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
-      final kost = Kost.fromFirestore(kostDoc);
-      final room = kost.rooms.firstWhere((r) => r.id == roomId);
-      
-      return room.status == 'available';
+      return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceAll('Exception: ', '');
       return false;
     }
   }
 
   // Update room status
   Future<void> _updateRoomStatus(String kostId, String roomId, String status) async {
-    final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
-    final kostData = kostDoc.data() as Map<String, dynamic>;
-    final rooms = List<Map<String, dynamic>>.from(kostData['rooms'] ?? []);
-    
-    final roomIndex = rooms.indexWhere((room) => room['id'] == roomId);
-    if (roomIndex != -1) {
-      rooms[roomIndex]['status'] = status;
+    try {
+      final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
+      if (!kostDoc.exists) {
+        throw Exception('Kost not found');
+      }
+
+      final kostData = kostDoc.data() as Map<String, dynamic>;
+      final floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
       
+      // Find the floor containing the room
+      String? targetFloorKey;
+      int? roomIndex;
+      
+      for (var entry in floors.entries) {
+        final rooms = List<Map<String, dynamic>>.from(entry.value['rooms'] ?? []);
+        final index = rooms.indexWhere((room) => room['id'] == roomId);
+        if (index != -1) {
+          targetFloorKey = entry.key;
+          roomIndex = index;
+          break;
+        }
+      }
+      
+      if (targetFloorKey == null || roomIndex == null) {
+        throw Exception('Room not found');
+      }
+      
+      // Update room status in the floor
+      final rooms = List<Map<String, dynamic>>.from(floors[targetFloorKey]['rooms'] ?? []);
+      rooms[roomIndex]['status'] = status;
+      floors[targetFloorKey]['rooms'] = rooms;
+      
+      // Update kost document
       await _firestore.collection('kosts').doc(kostId).update({
-        'rooms': rooms,
+        'floors': floors,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+    } catch (e) {
+      _error = e.toString();
+      print('Error updating room status: $e');
+      rethrow; // Rethrow to handle in createBooking
     }
   }
 
