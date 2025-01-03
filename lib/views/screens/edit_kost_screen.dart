@@ -129,7 +129,12 @@ class _EditKostScreenState extends State<EditKostScreen> {
     } else {
       // Update existing kost
       final updates = kost.toMap();
-      success = await controller.updateKostWithFloors(widget.kost!.id, updates, _floorPlanFiles);
+      success = await controller.updateKostWithFloors(
+        widget.kost!.id, 
+        updates, 
+        _floorPlanFiles,
+        _imageFiles,
+      );
     }
 
     if (mounted) {

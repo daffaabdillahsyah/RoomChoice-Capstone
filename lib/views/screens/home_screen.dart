@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
+import '../../controllers/kost_controller.dart';
 import '../screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -81,113 +82,158 @@ class _HomeScreenState extends State<HomeScreen> {
               
               // Kost Grid
               Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.68,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: 10, // TODO: Replace with actual kost data
-                  itemBuilder: (context, index) {
-                    return Card(
-                      clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          // TODO: Navigate to detail
-                        },
+                child: Consumer<KostController>(
+                  builder: (context, controller, child) {
+                    if (controller.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final verifiedKosts = controller.kosts
+                        .where((k) => k.status == 'verified')
+                        .toList();
+
+                    if (verifiedKosts.isEmpty) {
+                      return Center(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Kost Image
-                            AspectRatio(
-                              aspectRatio: 1,
-                              child: Image.network(
-                                'https://picsum.photos/seed/$index/300/300',
-                                fit: BoxFit.cover,
-                              ),
+                            Icon(
+                              Icons.home_work_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
                             ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(6),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Kost Name
-                                    Text(
-                                      'Kost Name ${index + 1}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    // Location
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.location_on, size: 12),
-                                        const SizedBox(width: 2),
-                                        Expanded(
-                                          child: Text(
-                                            'Location address',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey[600],
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    // Price
-                                    Text(
-                                      'Rp 1.500.000',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Theme.of(context).primaryColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            // Warning Banner
-                            Container(
-                              width: double.infinity,
-                              color: Colors.yellow[700],
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.warning_amber_rounded,
-                                    color: Colors.grey[900],
-                                    size: 12,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    'Not Verified',
-                                    style: TextStyle(
-                                      color: Colors.grey[900],
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'No verified kosts available',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
+                      );
+                    }
+
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.68,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
                       ),
+                      itemCount: verifiedKosts.length,
+                      itemBuilder: (context, index) {
+                        final kost = verifiedKosts[index];
+                        return Card(
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: InkWell(
+                            onTap: () {
+                              // TODO: Navigate to detail
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Kost Image
+                                AspectRatio(
+                                  aspectRatio: 1,
+                                  child: kost.images.isNotEmpty
+                                      ? Image.network(
+                                          kost.images.first,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Container(
+                                          color: Colors.grey[200],
+                                          child: Icon(
+                                            Icons.image_not_supported_outlined,
+                                            size: 48,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Kost Name
+                                        Text(
+                                          kost.name,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        // Location
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.location_on, size: 12),
+                                            const SizedBox(width: 2),
+                                            Expanded(
+                                              child: Text(
+                                                kost.address,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[600],
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        // Price
+                                        Text(
+                                          'Rp ${kost.price.toStringAsFixed(0)}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Theme.of(context).primaryColor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Status Banner
+                                Container(
+                                  width: double.infinity,
+                                  color: Colors.green[700],
+                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.verified,
+                                        color: Colors.white,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        'Verified',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -214,7 +260,6 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _selectedIndex = index;
           });
-          // TODO: Implement navigation
         },
         destinations: [
           const NavigationDestination(

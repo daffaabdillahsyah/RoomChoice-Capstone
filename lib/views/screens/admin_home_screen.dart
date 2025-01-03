@@ -4,6 +4,8 @@ import '../../controllers/dashboard_controller.dart';
 import '../../controllers/kost_controller.dart';
 import '../screens/profile_screen.dart';
 import '../screens/manage_kost_screen.dart';
+import '../screens/verify_kost_screen.dart';
+import '../screens/user_list_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -37,9 +39,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           // Kosts Page
           const ManageKostScreen(),
           // Users Page
-          const Center(child: Text('Users')),
+          const UserListScreen(),
           // Verifications Page
-          const Center(child: Text('Verifications')),
+          const VerifyKostScreen(),
           // Profile Page
           const ProfileScreen(),
         ],

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../models/kost_model.dart';
+import 'dart:convert';
 
 class KostController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -351,82 +352,45 @@ class KostController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Create kost document first to get the ID
-      final kostRef = await _firestore.collection('kosts').add(kost.toMap());
-      final kostId = kostRef.id;
-
-      // Upload floor plans
+      // Convert floor plan files to base64
       Map<int, FloorPlan> floors = {};
       for (var entry in floorPlanFiles.entries) {
         if (entry.value != null) {
           try {
-            // Create a specific path for this kost's floor plans
-            final floorRef = _storage
-                .ref()
-                .child('kosts')
-                .child(kostId)
-                .child('floor_plans')
-                .child('floor_${entry.key}');
-            
-            // Upload with metadata
-            final metadata = SettableMetadata(
-              contentType: 'image/jpeg',
-              customMetadata: {
-                'kostId': kostId,
-                'floor': entry.key.toString(),
-              },
-            );
-            await floorRef.putFile(entry.value!, metadata);
-            final floorPlanUrl = await floorRef.getDownloadURL();
+            // Read file as bytes and convert to base64
+            final bytes = await entry.value!.readAsBytes();
+            final base64String = base64Encode(bytes);
             
             floors[entry.key] = FloorPlan(
-              imageUrl: floorPlanUrl,
+              imageUrl: 'data:image/jpeg;base64,$base64String',
               name: 'Floor ${entry.key}',
               rooms: [],
             );
           } catch (e) {
-            print('Error uploading floor plan ${entry.key}: $e');
-            // Continue with other uploads even if one fails
+            print('Error converting floor plan ${entry.key}: $e');
           }
         }
       }
 
-      // Upload images
+      // Convert images to base64
       List<String> imageUrls = [];
       for (var imageFile in imageFiles) {
         try {
-          // Create a specific path for this kost's images
-          final imageRef = _storage
-              .ref()
-              .child('kosts')
-              .child(kostId)
-              .child('images')
-              .child('image_${DateTime.now().millisecondsSinceEpoch}');
-          
-          // Upload with metadata
-          final metadata = SettableMetadata(
-            contentType: 'image/jpeg',
-            customMetadata: {
-              'kostId': kostId,
-            },
-          );
-          await imageRef.putFile(imageFile, metadata);
-          final imageUrl = await imageRef.getDownloadURL();
-          imageUrls.add(imageUrl);
+          // Read file as bytes and convert to base64
+          final bytes = await imageFile.readAsBytes();
+          final base64String = base64Encode(bytes);
+          imageUrls.add('data:image/jpeg;base64,$base64String');
         } catch (e) {
-          print('Error uploading image: $e');
-          // Continue with other uploads even if one fails
+          print('Error converting image: $e');
         }
       }
 
-      // Update kost document with the uploaded files
-      final kostData = {
+      // Create kost document with base64 images
+      final kostRef = await _firestore.collection('kosts').add({
         ...kost.toMap(),
         'floors': floors.map((key, value) => MapEntry(key.toString(), value.toMap())),
         'images': imageUrls,
-      };
-
-      await kostRef.update(kostData);
+      });
 
       _isLoading = false;
       notifyListeners();
@@ -443,6 +407,7 @@ class KostController extends ChangeNotifier {
     String kostId,
     Map<String, dynamic> updates,
     Map<int, File?> newFloorPlanFiles,
+    List<File> newImageFiles,
   ) async {
     try {
       _isLoading = true;
@@ -454,51 +419,44 @@ class KostController extends ChangeNotifier {
       final kostData = kostDoc.data() as Map<String, dynamic>;
       Map<String, dynamic> floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
 
-      // Upload new floor plans
+      // Convert new floor plans to base64
       for (var entry in newFloorPlanFiles.entries) {
         if (entry.value != null) {
           try {
-            // Delete old floor plan if exists
-            final oldFloorPlan = floors[entry.key.toString()];
-            if (oldFloorPlan != null) {
-              final oldUrl = oldFloorPlan['imageUrl'];
-              if (oldUrl != null) {
-                try {
-                  await _storage.refFromURL(oldUrl).delete();
-                } catch (e) {
-                  print('Error deleting old floor plan: $e');
-                }
-              }
-            }
-
-            // Upload new floor plan
-            final floorRef = _storage
-                .ref()
-                .child('kosts')
-                .child(kostId)
-                .child('floor_plans')
-                .child('floor_${entry.key}_${DateTime.now().millisecondsSinceEpoch}');
-            
-            // Upload with metadata
-            final metadata = SettableMetadata(
-              contentType: 'image/jpeg',
-              customMetadata: {
-                'kostId': kostId,
-                'floor': entry.key.toString(),
-              },
-            );
-            await floorRef.putFile(entry.value!, metadata);
-            final floorPlanUrl = await floorRef.getDownloadURL();
+            // Read file as bytes and convert to base64
+            final bytes = await entry.value!.readAsBytes();
+            final base64String = base64Encode(bytes);
             
             floors[entry.key.toString()] = {
-              'imageUrl': floorPlanUrl,
+              'imageUrl': 'data:image/jpeg;base64,$base64String',
               'name': 'Floor ${entry.key}',
-              'rooms': oldFloorPlan?['rooms'] ?? [],
+              'rooms': floors[entry.key.toString()]?['rooms'] ?? [],
             };
           } catch (e) {
-            print('Error updating floor plan ${entry.key}: $e');
-            // Continue with other updates even if one fails
+            print('Error converting floor plan ${entry.key}: $e');
           }
+        }
+      }
+
+      // Convert new images to base64 if any
+      if (newImageFiles.isNotEmpty) {
+        List<String> existingImages = List<String>.from(kostData['images'] ?? []);
+        List<String> newImageUrls = [];
+
+        for (var imageFile in newImageFiles) {
+          try {
+            // Read file as bytes and convert to base64
+            final bytes = await imageFile.readAsBytes();
+            final base64String = base64Encode(bytes);
+            newImageUrls.add('data:image/jpeg;base64,$base64String');
+          } catch (e) {
+            print('Error converting new image: $e');
+          }
+        }
+
+        // Combine existing and new images
+        if (newImageUrls.isNotEmpty) {
+          updates['images'] = [...existingImages, ...newImageUrls];
         }
       }
 
