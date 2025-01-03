@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/kost_controller.dart';
 import '../screens/profile_screen.dart';
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -142,10 +143,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 AspectRatio(
                                   aspectRatio: 1,
                                   child: kost.images.isNotEmpty
-                                      ? Image.network(
-                                          kost.images.first,
-                                          fit: BoxFit.cover,
-                                        )
+                                      ? kost.images.first.startsWith('data:image')
+                                          ? Image.memory(
+                                              base64Decode(kost.images.first.split(',')[1]),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : Image.network(
+                                              kost.images.first,
+                                              fit: BoxFit.cover,
+                                            )
                                       : Container(
                                           color: Colors.grey[200],
                                           child: Icon(

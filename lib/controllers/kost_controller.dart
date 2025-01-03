@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../models/kost_model.dart';
 import 'dart:convert';
 
 class KostController extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   
   List<Kost> _kosts = [];
   bool _isLoading = false;
@@ -36,18 +34,17 @@ class KostController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Upload floor plan
-      final floorPlanRef = _storage.ref('floor_plans/${DateTime.now().millisecondsSinceEpoch}');
-      await floorPlanRef.putFile(floorPlanFile);
-      final floorPlanUrl = await floorPlanRef.getDownloadURL();
+      // Convert floor plan to base64
+      final floorPlanBytes = await floorPlanFile.readAsBytes();
+      final floorPlanBase64 = base64Encode(floorPlanBytes);
+      final floorPlanUrl = 'data:image/jpeg;base64,$floorPlanBase64';
 
-      // Upload images
+      // Convert images to base64
       List<String> imageUrls = [];
       for (var imageFile in imageFiles) {
-        final imageRef = _storage.ref('kost_images/${DateTime.now().millisecondsSinceEpoch}');
-        await imageRef.putFile(imageFile);
-        final imageUrl = await imageRef.getDownloadURL();
-        imageUrls.add(imageUrl);
+        final bytes = await imageFile.readAsBytes();
+        final base64String = base64Encode(bytes);
+        imageUrls.add('data:image/jpeg;base64,$base64String');
       }
 
       // Create kost document
@@ -99,24 +96,7 @@ class KostController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Get kost data
-      final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
-      final kostData = kostDoc.data();
-
-      // Delete images from storage
-      if (kostData != null) {
-        final List<String> images = List<String>.from(kostData['images'] ?? []);
-        for (var imageUrl in images) {
-          await _storage.refFromURL(imageUrl).delete();
-        }
-        
-        // Delete floor plan
-        if (kostData['floorPlanImage'] != null) {
-          await _storage.refFromURL(kostData['floorPlanImage']).delete();
-        }
-      }
-
-      // Delete kost document
+      // Delete kost document directly since we're using base64 for images
       await _firestore.collection('kosts').doc(kostId).delete();
 
       _isLoading = false;

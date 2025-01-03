@@ -4,6 +4,7 @@ import '../../controllers/kost_controller.dart';
 import '../../models/kost_model.dart';
 import 'edit_kost_screen.dart';
 import 'manage_rooms_screen.dart';
+import 'dart:convert';
 
 class ManageKostScreen extends StatelessWidget {
   const ManageKostScreen({super.key});
@@ -91,10 +92,15 @@ class ManageKostScreen extends StatelessWidget {
           if (kost.images.isNotEmpty)
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.network(
-                kost.images.first,
-                fit: BoxFit.cover,
-              ),
+              child: kost.images.first.startsWith('data:image')
+                ? Image.memory(
+                    base64Decode(kost.images.first.split(',')[1]),
+                    fit: BoxFit.cover,
+                  )
+                : Image.network(
+                    kost.images.first,
+                    fit: BoxFit.cover,
+                  ),
             ),
 
           Padding(
