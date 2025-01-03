@@ -164,7 +164,7 @@ class ManageKostScreen extends StatelessWidget {
 
                 // Room Count
                 Text(
-                  '${kost.rooms.length} Rooms',
+                  '${kost.totalRooms} Rooms',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,

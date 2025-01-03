@@ -31,6 +31,10 @@ class Kost {
     required this.rooms,
   });
 
+  int get totalRooms {
+    return floors.values.fold(0, (sum, floor) => sum + floor.rooms.length);
+  }
+
   factory Kost.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Kost(
