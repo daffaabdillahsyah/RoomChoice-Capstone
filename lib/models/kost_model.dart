@@ -43,8 +43,8 @@ class Kost {
       status: data['status'] ?? 'pending',
       images: List<String>.from(data['images'] ?? []),
       facilities: Map<String, dynamic>.from(data['facilities'] ?? {}),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       floors: (data['floors'] as Map<String, dynamic>? ?? {}).map(
         (key, value) => MapEntry(
           int.parse(key),

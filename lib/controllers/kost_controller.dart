@@ -74,6 +74,12 @@ class KostController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Check if document exists first
+      final docSnapshot = await _firestore.collection('kosts').doc(kostId).get();
+      if (!docSnapshot.exists) {
+        throw Exception('Kost document not found');
+      }
+
       await _firestore.collection('kosts').doc(kostId).update(updates);
 
       _isLoading = false;
@@ -546,8 +552,12 @@ class KostController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Get current kost data
+      // Check if document exists first
       final kostDoc = await _firestore.collection('kosts').doc(kostId).get();
+      if (!kostDoc.exists) {
+        throw Exception('Kost document not found');
+      }
+
       final kostData = kostDoc.data() as Map<String, dynamic>;
       Map<String, dynamic> floors = Map<String, dynamic>.from(kostData['floors'] ?? {});
 
@@ -594,6 +604,7 @@ class KostController extends ChangeNotifier {
 
       // Update kost document
       updates['floors'] = floors;
+      updates['updatedAt'] = FieldValue.serverTimestamp();
       await _firestore.collection('kosts').doc(kostId).update(updates);
 
       _isLoading = false;
